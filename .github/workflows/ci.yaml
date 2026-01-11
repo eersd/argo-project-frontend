@@ -1,0 +1,64 @@
+name: CI Frontend (Build & Push to ACR)
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["*.*.*"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ACR_NAME: ${{ vars.ACR_NAME}}
+  IMAGE_NAME: argo-frontend
+  NODE_VERSION: "22"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Declare tag variable as artifact
+        id: vars
+        shell: bash
+        run: |
+          echo $(git rev-parse --short HEAD) >tag
+          # if it is a tag, use the tag
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+                echo ${GITHUB_REF#refs/tags/} >tag
+          fi
+          echo "tag=$(cat tag)" >> "$GITHUB_OUTPUT"
+
+      - name: Azure Login
+        if: github.event_name != 'pull_request'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR
+        if: github.event_name != 'pull_request'
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          # We tag with 'latest' and the short Git SHA for ArgoCD tracking
+          tags: |
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
