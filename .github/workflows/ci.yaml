@@ -4,11 +4,11 @@ on:
   push:
     branches: ["main"]
     paths:
-      - 'argo-project-frontend/**'
+      - "**"
   pull_request:
     branches: ["main"]
     paths:
-      - 'argo-project-frontend/**'
+      - "**"
 
 permissions:
   id-token: write
@@ -45,7 +45,7 @@ jobs:
       - name: Build and Push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: ./argo-project-frontend
+          context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
