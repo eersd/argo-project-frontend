@@ -17,8 +17,6 @@ permissions:
 env:
   ACR_NAME: ${{ vars.ACR_NAME }}
   IMAGE_NAME: argo-frontend
-  CONTAINER_APP_NAME: argo-frontend
-  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
 
 jobs:
   build-and-deploy:
@@ -59,6 +57,5 @@ jobs:
         uses: azure/container-apps-deploy-action@v1
         with:
           imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          containerAppName: ${{ env.CONTAINER_APP_NAME }}
-          resourceGroup: ${{ env.RESOURCE_GROUP }}
-          _useGitPatch: false
+          containerAppName: app-frontend-dev # Matches Terraform name
+          resourceGroup: ${{ vars.ACA_RESOURCE_GROUP }} # Use environment-scoped variable
