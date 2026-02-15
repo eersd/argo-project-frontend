@@ -30,4 +30,4 @@ RUN echo 'server { \
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/bin/sh", "-c", "echo \"window._env_ = { BACKEND_URL: '$BACKEND_URL' };\" > /usr/share/nginx/html/config.js && nginx -g 'daemon off;'"]
