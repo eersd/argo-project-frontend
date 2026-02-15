@@ -1,40 +1,31 @@
-name: CI Frontend (Build & Push to ACR)
+name: Frontend CI/CD (ACR & ACA)
 
 on:
   push:
     branches: ["main"]
-    tags: ["*.*.*"]
+    paths:
+      - 'argo-project-frontend/**'
   pull_request:
     branches: ["main"]
+    paths:
+      - 'argo-project-frontend/**'
 
 permissions:
   id-token: write
   contents: read
 
 env:
-  ACR_NAME: ${{ vars.ACR_NAME}}
+  ACR_NAME: ${{ vars.ACR_NAME }}
   IMAGE_NAME: argo-frontend
-  NODE_VERSION: "22"
+  CONTAINER_APP_NAME: argo-frontend
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
 
 jobs:
-  ci:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.vars.outputs.tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Declare tag variable as artifact
-        id: vars
-        shell: bash
-        run: |
-          echo $(git rev-parse --short HEAD) >tag
-          # if it is a tag, use the tag
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-                echo ${GITHUB_REF#refs/tags/} >tag
-          fi
-          echo "tag=$(cat tag)" >> "$GITHUB_OUTPUT"
 
       - name: Azure Login
         if: github.event_name != 'pull_request'
@@ -54,11 +45,19 @@ jobs:
       - name: Build and Push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./argo-project-frontend
           push: ${{ github.event_name != 'pull_request' }}
-          # We tag with 'latest' and the short Git SHA for ArgoCD tracking
           tags: |
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Deploy to Azure Container Apps
+        if: github.event_name != 'pull_request'
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          containerAppName: ${{ env.CONTAINER_APP_NAME }}
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          _useGitPatch: false
